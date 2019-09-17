@@ -17,7 +17,7 @@ def recog():
         f = open('./record/en_record.wav','rb')
         result = recognize(signal,token)
         if result != '':
-            ans = TL(result)
+            ans = Dis_Ans(result)
         f.close()
         data = {"text":ans}
         return data

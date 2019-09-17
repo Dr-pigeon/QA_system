@@ -8,7 +8,7 @@ from cos_sim import *
 from handle import Handle
 import xmltodict
 import os
-from ques_ans import ques_ans 
+from applet import *
 
 handle = Handle()  #微信公众号
 
@@ -19,7 +19,7 @@ app = Flask(__name__)
 def wordtovec():
     resp_data = request.data
     resp_data = resp_data.decode('utf-8')
-    text = resp_data['text']
+    text = eval(resp_data)['text']
     text_vec = WordToVec(text)
     return text_vec
 
@@ -47,7 +47,6 @@ def qa_api():
 #            content = "b'" + content + "'"
 #            content = eval(content).decode('utf-8') 
             content = content.encode('utf-8').decode('unicode_escape')
-            print (content)
             
             ans = Dis_Ans(content)
             response = {
@@ -58,7 +57,7 @@ def qa_api():
                 "Content": ans,
             }
         elif resp_dict.get('MsgType') == 'voice':
-            content = resp_dict.get('Content')
+            content = resp_dict.get('Recognition')
             content = content.encode('utf-8').decode('unicode_escape')
             ans = Dis_Ans(content)
             
@@ -87,24 +86,19 @@ def wx():
     result = handle.GET()
 
 
-#小程序
-@app.route('/applet', methods=['POST'])
-def applet():
-    if request.method == 'POST':
-        data = request.data
-        data = eval(data.decode('utf-8'))
-        if data['action'] == 'login':
-            return str(time.asctime(time.localtime(time.time())))
-        elif data['action'] == 'text':
-            text = data['text']
-            ans = ques_ans(text)
-            return {'text':ans[0:-1]}
-        elif data['action'] == 'voice':
-            pass
+#问答
+@app.route('/ques_ans', methods=['POST'])
+def ques_ans():
+    data = request.data
+    data = data.decode('utf-8`')
+    data = eval(data)
+    dict_data = eval(data)
+    text = dict_data['text']
+    ans = Dis_Ans(text)
+    return ans
 
 if __name__ == '__main__':
-    #app.config['SERVER_NAME'] = 'www.kenchan.net.cn'
-    app.run(host='0.0.0.0',port=13011,debug=True,ssl_context=('1_www.kenchan.net.cn_bundle.crt','2_www.kenchan.net.cn.key'))
+    app.run(host='0.0.0.0',port=13011,debug=True)
 
 
 
