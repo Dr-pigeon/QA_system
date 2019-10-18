@@ -14,6 +14,9 @@ import dateutil.parser
 import random
 import jieba
 import re
+from search_summary import search_enginee
+from langconv import *
+
 
 # 百度翻译API
 appid = '20190612000306940'  # 你的appid
@@ -82,6 +85,10 @@ def record(text, ans, ques, src):
     f.write(str(
         [str(time.asctime(time.localtime(time.time()))), str(text + ' ' + ques + ' ' + ans + ' ' + str(src))]) + '\n')
     f.close()
+    url = 'https://www.kenchan.net.cn:13011/record'
+    headers = {'Content-Type':'application/json'}
+    data = {'text': text, 'ques': ques, 'ans': ans, 'src': src}
+    response = requests.post(url,headers=headers, data=json.dumps(data))
 
 
 def cosine_similarity(vector1, vector2):
@@ -95,7 +102,6 @@ def cosine_similarity(vector1, vector2):
     if normA == 0.0 or normB == 0.0:
         return 0
     else:
-        print(round(dot_product / ((normA ** 0.5) * (normB ** 0.5)) * 100, 2) / 100)
         return round(dot_product / ((normA ** 0.5) * (normB ** 0.5)) * 100, 2) / 100
 
 
@@ -103,9 +109,10 @@ def course_search(course_code, sentence):
     url = 'https://api.data.um.edu.mo/service/academic/course_catalog/v1.0.0/all?course_code=' + str(course_code)
     headers = {'Authorization': 'Bearer 5943d8ed-920d-3bf0-b01a-628f1e9294f1'}
     r = requests.get(url, headers=headers)
-    form_data = eval(r.text[:-1])['_embedded'][0]
-    if form_data == []:
+    if eval(r.text[:-1])['_embedded'] == []:
         return '你是不是搞错啦，澳大没有这门课呀~'
+    form_data = eval(r.text[:-1])['_embedded'][0]
+
     title_ques = [course_code + '这门课是什么', course_code + '的title是啥', course_code + '的课名是什么']
     oldcode_ques = [course_code + '旧的代码是什么', course_code + '以前的代码是啥']
     content_ques = [course_code + '这门课是学啥的', course_code + '这门课教什么', course_code + '是学什么的', course_code+'讲什么内容',course_code+'内容是啥']
@@ -152,20 +159,28 @@ def UM_bus():
     r = requests.get(url, headers=headers)
     data = eval(r.text)['_embedded'][0]
     bus_dict = {'time': data['datetime'][11:19], 'station': data['station']}
-    start_time = dateutil.parser.parse(data['datetime'][:19].replace('T', '/'))
-    end_time = dateutil.parser.parse(datetime.now().isoformat()[:19].replace('T', '/'))
-    mins = math.ceil((end_time - start_time).seconds / 60)
+    #start_time = dateutil.parser.parse(data['datetime'][:19].replace('T', '/'))
+    #end_time = dateutil.parser.parse(datetime.now().isoformat()[:19].replace('T', '/'))
+    #mins = math.ceil((end_time - start_time).seconds / 60)
     template = ['环校巴士在' + bus_dict['time'] + '经停' + bus_dict['station'] + '车站。',
-                '环校巴士上一站刚过' + bus_dict['station'] + '呀！', \
-                '校巴在' + str(mins) + '分钟前经停了' + bus_dict['station'] + '啦']
+                '环校巴士上一站刚过' + bus_dict['station'] + '呀！']
     text = random.sample(template, 1)
-    return text
+    return str(text[0])
 
 
 def Dis_Ans(text):
     # inputs = open('./Q_A_vec.txt', 'r', encoding='utf-8-sig')
+    text = Converter('zh-hans').convert(text)
     results = []
     vec = WordToVec(text)
+
+    seg_list = jieba.cut(text)
+    seg_text = "，".join(seg_list)
+    pattern = re.compile('[0-9A-Za-z]+')
+    if pattern.findall(seg_text) != [] and re.match('[A-Z]{4}[0-9]{3,4}|[a-z]{4}[0-9]{3,4}', pattern.findall(seg_text)[0]):
+        ans = course_search(pattern.findall(seg_text)[0], text)
+        if ans != []:
+            return ans
 
     for i in range(len(api_vec)):
         results.append(cosine_similarity(vec, eval(api_vec[i][:-1])))
@@ -180,14 +195,6 @@ def Dis_Ans(text):
         elif results.index(max(results)) == 2 or results.index(max(results)) == 3:
             ans = UM_bus()
             return ans
-        elif results.index(max(results)) == 4 or results.index(max(results)) == 5:
-            seg_list = jieba.cut(text)
-            seg_text = ", ".join(seg_list)
-            pattern = re.compile('[0-9A-Za-z]+')
-            for i in seg_text:
-                if pattern.findall(i)[0] == i:
-                    ans = course_search(i, text)
-                    return ans
 
     results = []
     for i in range(length):
@@ -197,10 +204,15 @@ def Dis_Ans(text):
         # ans = open('./Q_A_ans.txt', 'r', encoding='utf-8')
         record(text, data[results.index(max(results))][1], data[results.index(max(results))][2], max(results))
         return data[results.index(max(results))][1]
+
+    ans = search_enginee(text)
+    if ans != None:
+        record(text, 'None', ans, 1)
+        return ans
     else:
         ans = TL(text)
         record(text, 'None', ans, 0)
-        return TL(text)
+        return ans
 
 
 def TL(text):
@@ -209,3 +221,6 @@ def TL(text):
     data = {"key": key, "info": text, "userid": "fool"}
     r = requests.post(api, data=json.dumps(data)).content
     return json.loads(r.decode('utf-8'))['text']
+
+if __name__ == '__main__':
+    print(Dis_Ans('澳大校巴'))
