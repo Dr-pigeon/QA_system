@@ -1,0 +1,132 @@
+.right-Avatar {
+  float: right;
+  width: 85rpx;
+  height: 85rpx;
+}
+
+page{
+  background-color: #C6E2FF;
+  
+}
+
+
+
+.right-Triangle {
+  float: right;
+  margin-top: 35rpx;
+  width: 0;
+  height: 0;
+  border-top: 16rpx solid transparent;
+  border-left: 24rpx solid #B0E2FF;
+  border-bottom: 16rpx solid transparent;
+}
+
+.right-message {
+  float: right;
+  display: inline-block;
+  margin-top: 10rpx;
+  padding-top: 5rpx;
+  padding-left:20rpx;
+  line-height: 65rpx;
+  background: #B0E2FF;
+  border-radius: 10rpx;
+  font-size: 32rpx;
+  max-width: 550rpx; 
+  word-break: break-all;
+}
+
+.right-speech-message {
+  float: right;
+  margin-top: 10rpx;
+  line-height: 65rpx;
+  background:  #B0E2FF;
+  border-radius: 10rpx;
+  font-size: 32rpx;
+  width: 150rpx;
+}
+
+.left-speech-message {
+  float: left;
+  margin-top: 10rpx;
+  line-height: 65rpx;
+  background:rgb(255, 255, 255);
+  border-radius: 10rpx;
+  font-size: 32rpx;
+  width: 150rpx;
+}
+
+.left-Avatar {
+  float: left;
+  width: 85rpx;
+  height: 85rpx;
+}
+
+.left-Triangle {
+  float: left;
+  margin-top: 35rpx;
+  width: 0;
+  height: 0;
+  border-top: 16rpx solid transparent;
+  border-right: 24rpx solid rgb(255, 255, 255);
+  border-bottom: 16rpx solid transparent;
+}
+
+.left-message {
+  float: left;
+  display: inline-block;
+  margin-top: 10rpx;
+  padding-top: 5rpx;
+  padding-left:20rpx;
+  line-height: 65rpx;
+  background: rgb(255, 255, 255);
+  border-radius: 10rpx;
+  font-size: 32rpx;
+  max-width: 550rpx;
+  word-break: break-all;
+}
+
+.speech-button {
+  height: 70rpx;
+  margin-left: 30rpx;
+  margin-right: 30rpx;
+  line-height: 70rpx;
+  background: white;
+}
+
+.button-hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  opacity: 0.7;
+}
+
+.icon {
+  vertical-align: middle;
+  margin-top: 8rpx;
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.ion-ios {
+  background-size: 64rpx 64rpx;
+  background-repeat: no-repeat;
+  background-position: center center;
+  vertical-align: middle;
+}
+
+.emotion {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  margin: 10rpx;
+}
+
+#emotionPanel {
+  padding-left: 40rpx;
+}
+
+.send-button {
+  margin-left: 10rpx;
+  margin-top: 8rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  background-color: "#0066FF";
+}
