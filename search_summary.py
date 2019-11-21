@@ -8,17 +8,17 @@ import TextProcess as T
 
 
 
-def kwquery(query):
-    #分词 去停用词 抽取关键词
-    keywords = []
-    words = T.postag(query)
-    for k in words:
-        # 只保留名词
-        if k.flag.__contains__("n"):
-            # print k.flag
-            # print k.word
-            keywords.append(k.word)
-    return keywords
+#def kwquery(query):
+#    #分词 去停用词 抽取关键词
+#    keywords = []
+#    words = T.postag(query)
+#    for k in words:
+#        # 只保留名词
+#        if k.flag.__contains__("n"):
+#            # print k.flag
+#            # print k.word
+#            keywords.append(k.word)
+#    return keywords
 
 def BD_search(query):
     answer = []
@@ -273,7 +273,7 @@ def No_ans(keywords, text):
 
 
 def search_enginee(query):
-    keywords = kwquery(query)
+    #keywords = kwquery(query)
     text = ''
     ans, text1 = BD_search(query)
     text += text1
@@ -286,4 +286,4 @@ def search_enginee(query):
 
 
 if __name__ == '__main__':
-    print(search_enginee('澳门大学有多少学生'))
+    print(search_enginee('今天天气怎么样'))

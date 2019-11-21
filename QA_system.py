@@ -103,5 +103,4 @@ if __name__ == '__main__':
 
 
 
-
 #        s = '<xml><ToUserName><![CDATA[gh_df23ae4e6849]]></ToUserName><FromUserName><![CDATA[oXgg5wRikHIYuAiZAHokqqFhZSoE]]></FromUserName><CreateTime>1565259951</CreateTime><MsgType><![CDATA[text]]></MsgType><Content><![CDATA[\\u6fb3\\u9580\\u5927\\u5b78\\u5728\\u54ea\\ud855\\ude83]]></Content><MsgId>22409136513325645</MsgId></xml>'
