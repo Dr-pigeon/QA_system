@@ -1,0 +1,61 @@
+<template name="msgItem">
+  <view wx:for="{{contents}}" style="display:inline-block;white-space:pre-line" wx:key="unique">
+    <text wx:if="item.type=='text'" style="padding:0;margin:0;width:auto;" selectable>{{item.text}}</text>
+    <image wx:if="item.type=='image'" style="width:42rpx;height:42rpx;vertical-align:middle;margin:0 6rpx;" src="{{item.url}}"></image>
+  </view>
+</template>
+<scroll-view scroll-y style="height:{{scrollHeight}}rpx;background:#eee" scroll-into-view="{{toView}}">
+  <view>
+    <view class="padding clearfix">
+      <image class="left-Avatar padding_half" src="../images/robot.jpg"></image>
+      <view class="left-Triangle"></view>
+      <view class="left-message padding_half"><text>你好呀~请点击下方“获取”按钮获取最新监测数据！</text>
+      </view>
+    </view>
+  </view>
+  <view wx:for="{{messages}}" wx:for-item="i" wx:key="unique">
+    <view id="{{i.id}}" class="padding clearfix" wx:if="{{i.me}}">
+      <image class="right-Avatar padding_half" src="{{i.avatar}}"></image>
+      <view class="right-Triangle"></view>
+      <view class="right-speech-message padding_half" wx:if="{{i.speech}}" data-filePath="{{i.filePath}}" bindtap="playSpeech">
+        <view style="display:inline-block;">
+          <image style="width:52rpx;height:42rpx;vertical-align:middle;margin:0 6rpx;" src="{{playingSpeech==i.filePath?speechIcon:defaultSpeechIcon}}"></image> {{i.seconds}}″
+        </view>
+      </view>
+      <view class="right-message padding_half" wx:if="{{!i.speech}}">
+        <template is="msgItem" data="{{...i}}" />
+      </view>
+    </view>
+    <view id="{{i.id}}" class="padding clearfix" wx:if="{{!i.me}}">
+      <image class="left-Avatar padding_half" src="{{i.avatar}}"></image>
+      <view class="left-Triangle"></view>
+      <view class="left-speech-message padding_half" wx:if="{{i.speech}}" data-filePath="{{i.filePath}}" bindtap="playRobotSpeech">
+        <view style="display:inline-block;">
+          <image style="width:52rpx;height:42rpx;vertical-align:middle;margin:0 6rpx;" src="{{playingSpeech==i.filePath?speechIcon:defaultSpeechIcon}}"></image> {{i.seconds}}″
+        </view>
+      </view>
+      <view class="left-message padding_half" wx:if="{{!i.speech}}">
+        <template is="msgItem" data="{{...i}}" />
+      </view>
+    </view>
+  </view>
+  
+  <!-- <view class="charts"> 
+    <canvas canvas-id="columnCanvas" class="canvas" disable-scroll='true' style='width:{{code_w}}px;height:{{code_h}}px'></canvas>
+    <view style='width:680rpx;height:auto;' class="title_canvas"> <text>E1/2</text> <text>E11</text> <text>E12</text> <text>E21</text><text>E32</text><text>N1/2</text> <text>N6</text> <text>N21</text><text>N23</text><text>N24</text></view>
+  </view> -->
+<view wx:if="{{isMainChartDisplay}}"> 
+  <view class="container">
+    <view class="title">{{chartTitle}}</view>
+    <canvas canvas-id="columnCanvas" class="canvas" bindtouchstart="touchHandler"></canvas> 
+  </view>
+</view>
+
+<view class="weui-icon_success"></view> 
+</scroll-view>
+<view class="wa-row" style="height:100rpx;">
+  <button type="primary" size='mini' class="refresh-button" bindtap="getMonitorDataBtn">获取</button>
+</view>
+<view id="emotionPanel" wx:if="{{emotionBox}}">
+  <image wx:for="{{ emotions }}" src="{{item.src}}" class="emotion" data-name="{{item.name}}" bindtap="chooseEmotion"></image>
+</view>
