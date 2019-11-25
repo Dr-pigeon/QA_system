@@ -6,8 +6,6 @@ import requests
 import json
 import time
 from urllib import parse
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression, LinearRegression
 import hashlib
 import http.client
 from datetime import timedelta, datetime
@@ -22,8 +20,11 @@ from sklearn.preprocessing import PolynomialFeatures
 import datetime
 from search_summary import search_enginee
 from langconv import *
-from date_extract import time_extract
 import jieba.posseg as psg
+import sys
+sys.path.append('./date_extract')
+from date_extract.TimeNormalizer import *
+
 
 jieba.initialize()
 r = 1
@@ -51,7 +52,6 @@ secretKey = 'nQ5ZYndkvs9t6N3CIte8'  # 你的密钥
 f1 = open('./Q_A_vec.txt', 'r', encoding='utf-8-sig')
 f2 = open('./Q_A_ans.txt', 'r', encoding='utf-8')
 f3 = open('./Q_A.txt', 'r', encoding='utf-8')
-f4 = open('./api_vec.txt', 'r', encoding='utf-8')
 ques = [i for i in f3]
 vec = [i for i in f1]
 ans = [i for i in f2]
@@ -59,17 +59,11 @@ data = []
 length = len(vec)
 for i in range(length):
     data.append([vec[i], ans[i], ques[i]])
-api_vec = [i for i in f4]
 f1.close()
 f2.close()
 f3.close()
-f4.close()
 
-general_eles = {'E1-E2': {}, 'E12': {}, 'E32': {}, 'N6': {}, 'N23': {}, 'E21': {}, 'N24': {}, 'N21': {},
-                'E11': {}, 'N1-N2': {}}
-lim_eles = {'E1-E2': {}, 'E12': {}, 'E32': {}, 'N6': {}, 'N23': {}, 'E21': {}, 'N24': {}, 'N21': {},
-            'E11': {}, 'N1-N2': {}}
-
+tn = TimeNormalizer()
 
 def WordToVec(text):
     url = 'http://10.119.186.27:12031/encodeSent'
@@ -173,9 +167,8 @@ def UM_news(date_from, date_to):
     text = eval(r.text)
     count = 0
     ans = str('澳门大学最新新闻：\n')
-    print(text)
     if text['_embedded'] == []:
-        return ('澳门大学暂无最新新闻。')
+        return ('澳门大学昨日暂无新闻。')
     for news in text['_embedded'][0]['details']:
         count += 1
         ans = ans + str(str(count) + '. ' + news['title'] + '\n')
@@ -217,91 +210,79 @@ def Dis_Ans(text):
 
         for i in range(len(ele_text)):
             results.append(cosine_similarity(vec, eval(ele_vec[i])))
-            # print(results)
         if max(results) >= 0.8:
-            e = electricity()
             locations = []
-            date_extect = time_extract(text)
+            text1 = text
+            for k, v in psg.cut(text):
+                if v == 'ns':
+                    locations.append(k)
+                    text1 = text1.replace(k, '')
+            date_extect = tn.parse(text1)
+            print(date_extect)
             if eval(ele_text[results.index(max(results))])[1] == 1:
-                if len(date_extect) == 1:
-                    date_to = date_extect[0]
+                meter = None
+                if date_extect['type'] == 'timestamp':
+                    date_to = date_extect['timestamp']
                     date_from = None
                     date_to = date_to.replace(' ', 'T')
-                elif len(date_extect) == 2:
-                    date_from = date_extect[0]
-                    date_to = date_extect[1]
+                elif date_extect['type'] == 'timespan':
+                    date_from = date_extect['timespan'][0]
+                    date_to = date_extect['timespan'][1]
                     date_to = date_to.replace(' ', 'T')
                     date_from = date_from.replace(' ', 'T')
-                for k, v in psg.cut(text):
-                    if v == 'ns':
-                        locations.append(k)
-                ans = e.check_ele(locations[0], date_from, date_to, None)
-                return str({'text': ans, 'type': 'text'})
+                else:
+                    return str({'text': '请输入正确的时间呀！', 'type': 'text'})
+                return str({'ques': 1, 'type': 'ele', 'date1': date_from, 'date2': date_to, 'meters': meter})
             elif eval(ele_text[results.index(max(results))])[1] == 2:
-                for k, v in psg.cut(text):
-                    if v == 'ns':
-                        locations.append(k)
-                if len(locations) >= 2:
+                meter = None
+                if len(locations) >= 2 and date_extect['type'] == 'timestamp':
                     date1 = date_extect[0][:10]
                     date2 = None
-                elif len(locations) == 1:
-                    date1 = date_extect[0][:10]
-                    date2 = date_extect[1][:10]
-                ans = e.compare_ele(locations, date1, date2, None, None)
-                return str({'text': ans, 'type': 'text'})
-            elif eval(ele_text[results.index(max(results))])[1] == 3:
-                for k, v in psg.cut(text):
-                    if v == 'ns':
-                        locations.append(k)
-                if len(date_extect) == 1:
-                    date = date_extect[0][:10]
-                    return str({'location': locations[0], 'date': date, 'meter': None, 'time1': None, 'time2': None,
-                            'type': 'img'})
-                elif len(date_extect) >= 2:
-                    date = date_extect[0][:10]
-                    time1 = date_extect[0][11:]
-                    time2 = date_extect[1][11:]
-                    return str({'location': locations[0], 'date': date, 'meter': None, 'time1': time1, 'time2': time2,
-                            'type': 'img'})
-            elif eval(ele_text[results.index(max(results))])[1] == 4:
-                for k, v in psg.cut(text):
-                    if v == 'ns':
-                        locations.append(k)
-                if len(date_extect) == 1:
-                    date2 = date_extect[0][:10]
-                    time1 = date_extect[0][11:19]
-                    time2 = ((datetime.datetime.strptime(date_extect[0],'%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                        hours=1)).strftime('%Y-%m-%d %H:%M:%S'))[11:19]
-                    ans = e.prediction(locations[0], None, date2, time1, time2)
-                    return str({'text': ans, 'type': 'text'})
-                elif len(date_extect) >= 2 and date_extect[0][11:19] == date_extect[1][11:19]:
-                    date1 = date_extect[0][:10]
-                    date2 = date_extect[1][:10]
-                    ans = e.prediction(locations[0], date1, date2, None, None)
-                    return str({'text': ans, 'type': 'text'})
-                elif len(date_extect) >= 2 and date_extect[0][11:19] != date_extect[1][11:19]:
-                    date2 = date_extect[0][:10]
-                    time1 = date_extect[0][11:19]
-                    time2 = date_extect[1][11:19]
-                    ans = e.prediction(locations[0], None, date2, time1, time2)
-                    return str({'text':ans, 'type':'text'})
+                elif len(locations) == 1 and date_extect['type'] == 'timespan':
+                    date1 = date_extect['timespan'][0][:10]
+                    date2 = date_extect['timespan'][1][:10]
                 else:
-                    return str({'text':'Umor暂时无法做出这个预测噢~', 'type':'text'})
-
-        results = []
-        for i in range(len(api_vec)):
-            results.append(cosine_similarity(vec, eval(api_vec[i][:-1])))
-        if max(results) >= 0.8:
-            if results.index(max(results)) == 0 or results.index(max(results)) == 1:
+                    return str({'text': '请输入正确的时间呀！', 'type': 'text'})
+                return str({'ques': 2, 'type': 'ele', 'date1': date1, 'date2': date2, 'locations': locations, 'meters': meter})
+            elif eval(ele_text[results.index(max(results))])[1] == 3:
+                meter = None
+                if date_extect['type'] == 'timestamp':
+                    date = date_extect['timestamp'][:10]
+                    return str({'location': locations, 'date': date, 'meter': None, 'time1': None, 'time2': None,
+                            'type': 'ele', 'ques': 3, 'meters': meter})
+                elif date_extect['type'] == 'timespan':
+                    date = date_extect['span'][0][:10]
+                    time1 = date_extect['span'][0][11:]
+                    time2 = date_extect['span'][1][11:]
+                    return str({'location': locations, 'date': date, 'meter': None, 'time1': time1, 'time2': time2,
+                            'type': 'ele', 'ques': 3, 'meters': meter})
+            elif eval(ele_text[results.index(max(results))])[1] == 4:
+                meter = None
+                if date_extect['type'] == 'timestamp':
+                    date1 = None
+                    date2 = date_extect['timestamp'][:10]
+                    time1 = date_extect['timestamp'][11:]
+                    time2 = ((datetime.datetime.strptime(date_extect['timestamp'],'%Y-%m-%d %H:%M:%S') + datetime.timedelta(
+                        hours=1)).strftime('%Y-%m-%d %H:%M:%S'))[11:19]
+                elif ldate_extect['type'] == 'timespan':
+                    date1 = date_extect['timespan'][0][:10]
+                    date2 = date_extect['timespan'][1][:10]
+                    time1 = date_extect['timespan'][0][11:]
+                    time2 = date_extect['timespan'][1][11:]
+                else:
+                    return str({'text': '我暂时无法做出这个预测额。。。', 'type': 'text'})
+                return str({'ques': 4, 'type': 'ele', 'time1': time1, 'time2': time2, 'date2': date2,
+                                'locations': locations, 'date1': date1, 'meters': meter})
+            elif eval(ele_text[results.index(max(results))])[1] == 5:
                 # 调用UM NEWS API
-                yesterday = datetime.today() + timedelta(-1)
+                yesterday = datetime.datetime.today() + timedelta(-1)
                 yesterday_format = yesterday.strftime('%Y-%m-%d')
                 date_from = str(yesterday_format + 'T00:00:00')
                 date_to = str(yesterday_format + 'T23:59:59')
-                return UM_news(date_from, date_to)
-            elif results.index(max(results)) == 2 or results.index(max(results)) == 3:
+                return str({'text':UM_news(date_from, date_to), 'type':'text'})
+            elif eval(ele_text[results.index(max(results))])[1] == 6:
                 ans = UM_bus()
-                return ans
+                return str({'text':ans, 'type': 'text'})
 
         results = []
         for i in range(length):
@@ -317,345 +298,14 @@ def Dis_Ans(text):
             if ans != None:
                 ans = re.split('(。|！|\!|\.|？|\?)', ans)[0] + '。'
                 record(text, 'None', ans, 1)
-                return ans
+                return str({'text':ans, 'type': 'text'})
             ans = TL(text)
             record(text, 'None', ans, 0)
-            return ans
+            return str({'text':ans, 'type': 'text'})
         except BaseException:
             ans = TL(text)
             record(text, 'None', ans, 0)
-            return ans
-
-
-class electricity():
-    def __init__(self):
-        self.url = 'https://api.data.um.edu.mo/service/facilities/power_consumption/v1.0.0/all'
-        self.headers = {"Authorization": "Bearer 5943d8ed-920d-3bf0-b01a-628f1e9294f1"}
-
-    def check_ele(self, location=None, date_from=None, date_to=None, meter=None):
-        try:
-            if location is not None and date_from is not None and date_to is not None and meter is not None:
-                # next_time = (datetime.datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S')+ datetime.timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M')
-                # next_time = next_time.replace(' ','T')
-                url1 = self.url + '?zone_code=' + location + '&meter_code=' + meter + '&date_to=' + date_from
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                start = r[0]['readings']['kwh']
-                url1 = self.url + '?zone_code=' + location + '&meter_code=' + meter + '&date_to=' + date_to
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                end = r[0]['readings']['kwh']
-                result = end - start
-                return str(round(result, 2)) + ' kwh'
-            elif location is not None and date_to is not None and date_from is not None:
-                url1 = self.url + '?zone_code=' + location + '&date_to=' + date_from
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                date_from = date_from + '+08:00'
-                start = 0
-                for i in r:
-                    if i['recordDatetime'] == date_from:
-                        start += i['readings']['kwh']
-                url1 = self.url + '?zone_code=' + location + '&date_to=' + date_to
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                date_to = date_to + '+08:00'
-                end = 0
-                for i in r:
-                    if i['recordDatetime'] == date_to:
-                        end += i['readings']['kwh']
-                result = end - start
-                return str(round(result, 2)) + ' kwh'
-            elif location is not None and date_to is not None and meter is not None:
-                date_from = date_to[:10] + 'T00:00:00'
-                url1 = self.url + '?zone_code=' + location + '&meter_code=' + meter + '&date_to=' + date_from
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                start = r[0]['readings']['kwh']
-                url1 = self.url + '?zone_code=' + location + '&meter_code=' + meter + '&date_to=' + date_to
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                end = r[0]['readings']['kwh']
-                result = end - start
-                return str(round(result, 2)) + ' kwh'
-            elif location is not None and date_to is not None:
-                date_from = date_to[:10] + 'T00:00:00'
-                url1 = self.url + '?zone_code=' + location + '&date_to=' + date_from
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                date_from = date_from + '+08:00'
-                start = 0
-                for i in r:
-                    if i['recordDatetime'] == date_from:
-                        start += i['readings']['kwh']
-                if date_to[:10] + 'T23:45:00' <= datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S'):
-                    date_to = date_to[:10] + 'T23:45:00'
-                else:
-                    date_to = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-                url1 = self.url + '?zone_code=' + location + '&date_to=' + date_to
-                response = requests.get(url1, headers=self.headers)
-                r = response.json()['_embedded']
-                date_to = date_to + '+08:00'
-                end = 0
-                for i in r:
-                    if i['recordDatetime'] == date_to:
-                        end += i['readings']['kwh']
-                result = end - start
-                return str(round(result, 2)) + ' kwh'
-            elif date_to is not None:
-                zones = ['E1-E2', 'E12', 'E32', 'N6', 'N23', 'E21', 'N24', 'N21', 'E11', 'N1-N2']
-                end = 0
-                start = 0
-                for zone in zones:
-                    date_to = date_to[:19]
-                    url1 = self.url + '?zone_code=' + zone + '&date_to=' + date_to
-                    response = requests.get(url1, headers=self.headers)
-                    r = response.json()['_embedded']
-                    date_to = date_to + '+08:00'
-                    for i in r:
-                        if i['recordDatetime'] == date_to:
-                            end += i['readings']['kwh']
-                    date_from = date_to[:10] + 'T00:00:00'
-                    url1 = self.url + '?zone_code=' + zone + '&date_to=' + date_from
-                    response = requests.get(url1, headers=self.headers)
-                    r = response.json()['_embedded']
-                    date_from = date_from + '+08:00'
-                    for i in r:
-                        if i['recordDatetime'] == date_from:
-                            start += i['readings']['kwh']
-                result = end - start
-                return str(round(result, 2)) + ' kwh'
-            else:
-                return '抱歉，我暂时没有这方面数据噢，我会尽快学习~'
-        except KeyError:
-            return '抱歉，我暂时没有这方面数据噢，我会尽快学习~'
-
-    def compare_ele(self, locations, date1=None, date2=None, time1=None, time2=None):
-        try:
-            if len(locations) > 1 and date1 is not None and date2 is not None:
-                return '我只能比较多个地点在统一时间段的电力使用噢~'
-            elif len(locations) == 1 and date1 is not None and date2 is not None:
-                url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + date1 + 'T00:00:00'
-                r = requests.get(url1, headers=self.headers)
-                r = r.json()['_embedded']
-                start = 0
-                for i in r:
-                    if i['recordDatetime'] == date1 + 'T00:00:00+08:00':
-                        start += i['readings']['kwh']
-                end = 0
-                if date1 + 'T23:45:00' <= datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S'):
-                    url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + date1 + 'T23:45:00'
-                else:
-                    url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + datetime.datetime.now().strftime(
-                        '%Y-%m-%dT%H:%M:%S')
-                r = requests.get(url1, headers=self.headers)
-                r = r.json()['_embedded']
-                date_to = r[0]['recordDatetime']
-                for i in r:
-                    if i['recordDatetime'] == date_to:
-                        end += i['readings']['kwh']
-                result1 = end - start
-                url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + date2 + 'T00:00:00'
-                r = requests.get(url1, headers=self.headers)
-                r = r.json()['_embedded']
-                start = 0
-                for i in r:
-                    if i['recordDatetime'] == date2 + 'T00:00:00+08:00':
-                        start += i['readings']['kwh']
-                end = 0
-                if date2 + 'T23:45:00' <= datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S'):
-                    url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + date2 + 'T23:45:00'
-                else:
-                    url1 = self.url + '?zone_code=' + locations[0] + '&date_to=' + datetime.datetime.now().strftime(
-                        '%Y-%m-%dT%H:%M:%S')
-                r = requests.get(url1, headers=self.headers)
-                r = r.json()['_embedded']
-                date_to = r[0]['recordDatetime']
-                for i in r:
-                    if i['recordDatetime'] == date_to:
-                        end += i['readings']['kwh']
-                result2 = end - start
-                if result1 >= result2:
-                    return locations[0] + '在' + date1[5:].replace('-', '月') + '日用电多，足足用了' + str(
-                        round(result1, 2)) + ' kwh'
-                else:
-                    return locations[0] + '在' + date2[5:].replace('-', '月') + '日用电多，足足用了' + str(
-                        round(result2, 2)) + ' kwh'
-            elif len(locations) > 1 and date1 is not None:
-                result = []
-                for zone in locations:
-                    url1 = self.url + '?zone_code=' + zone + '&date_to=' + date1 + 'T00:00:00'
-                    r = requests.get(url1, headers=self.headers)
-                    r = r.json()['_embedded']
-                    start = 0
-                    for i in r:
-                        if i['recordDatetime'] == date1 + 'T00:00:00+08:00':
-                            start += i['readings']['kwh']
-                    end = 0
-                    if date1 + 'T23:45:00' <= datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S'):
-                        url1 = self.url + '?zone_code=' + zone + '&date_to=' + date1 + 'T23:45:00'
-                    else:
-                        url1 = self.url + '?zone_code=' + zone + '&date_to=' + datetime.datetime.now().strftime(
-                            '%Y-%m-%dT%H:%M:%S')
-                    r = requests.get(url1, headers=self.headers)
-                    r = r.json()['_embedded']
-                    date_to = r[0]['recordDatetime']
-                    for i in r:
-                        if i['recordDatetime'] == date_to:
-                            end += i['readings']['kwh']
-                    result.append(round(end - start, 2))
-                return locations[result.index(max(result))] + '耗电更多，足足用了' + str(max(result)) + ' kwh。'
-        except KeyError:
-            return '抱歉啊，Umor暂时无法作出这个比较噢~'
-
-    def prediction(self, location=None, date1=None, date2=None, time1=None, time2=None):
-        try:
-            if location is not None and date2 is not None and time1 is not None and time2 is not None:
-                eles = []
-                record = {}
-                date_to = (datetime.datetime.strptime(date2 + ' 00:00:00', '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                    days=-6)).strftime('%Y-%m-%d %H:%M:%S')
-                date_from = (datetime.datetime.strptime(date2 + ' 00:00:00', '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                    days=-7)).strftime('%Y-%m-%d %H:%M:%S')
-                while date_to >= datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'):
-                    date_to = (datetime.datetime.strptime(date_to, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                        days=-7)).strftime('%Y-%m-%d %H:%M:%S')
-                    date_from = (datetime.datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                        days=-7)).strftime('%Y-%m-%d %H:%M:%S')
-                while date_from <= date_to:
-                    ele = 0
-                    date_from = date_from.replace(' ', 'T')
-                    url1 = self.url + '?zone_code=' + location + '&date_to=' + date_from
-                    r = requests.get(url1, headers=self.headers)
-                    r = r.json()['_embedded']
-                    a = []
-                    for i in r:
-                        if i['recordDatetime'] == date_from + '+08:00':
-                            a.append(i['meterCode'])
-                            if i['meterCode'] in record.keys() and i['readings']['kwh'] != 0:
-                                ele += i['readings']['kwh']
-                                record[i['meterCode']] = i['readings']['kwh']
-                            elif i['meterCode'] in record.keys() and record[i['meterCode']] != 0 and i['readings'][
-                                'kwh'] == 0:
-                                ele += record[i['meterCode']]
-
-                            elif i['meterCode'] not in record.keys() and i['readings']['kwh'] != 0:
-                                record[i['meterCode']] = i['readings']['kwh']
-                                ele += record[i['meterCode']]
-                                eles = [j + i['readings']['kwh'] for j in eles]
-                    for i in record.keys():
-                        if i not in a:
-                            ele += record[i]
-                    if ele != 0:
-                        eles.append(round(ele, 2))
-                    date_from = date_from.replace('T', ' ')
-                    date_from = (datetime.datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                        hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-                y = []
-                for i in range(len(eles) - 1):
-                    y.append(round(eles[i + 1] - eles[i], 2))
-                x = list(range(24))
-                x = np.array(x)
-                x = x.reshape(-1, 1)
-                y = np.array(y)
-                y = y.reshape(-1, 1)
-                S = StandardScaler()
-                S.fit(x)
-                x = S.transform(x)
-                Log = LogisticRegression(C=10)
-                Log.fit(x, y.astype('int'))
-                print(time1,time2)
-                d = int(time2[:2]) - int(time1[:2])
-                prediction = 0
-                for i in range(d + 1):
-                    x_pred = np.array(int(time1[:2]) + i).reshape(-1, 1)
-                    prediction += Log.predict(x_pred)
-                return location + '在' + date2[5:7] + '月' + date2[8:] + '日' + str(int(time1[:2])) + '点到' + str(
-                    int(time2[:2])) + '点预计用电 ' + str(prediction[0]) + 'kwh。'
-            elif location is not None and date2 is not None and date1 is not None:
-                date_to = (datetime.datetime.strptime(date2, '%Y-%m-%d') + datetime.timedelta(
-                    days=-6)).strftime('%Y-%m-%d')
-                while date_to >= datetime.datetime.now().strftime('%Y-%m-%d'):
-                    date_to = (datetime.datetime.strptime(date_to, '%Y-%m-%d') + datetime.timedelta(
-                        days=-7)).strftime('%Y-%m-%d')
-                diff_time = datetime.datetime(int(date2[:4]), int(date2[5:7]), int(date2[8:])) - datetime.datetime(
-                    int(date_to[:4]), int(date_to[5:7]), int(date_to[8:]))
-                diff_time = diff_time.days
-                date_from = (datetime.datetime.strptime(date_to, '%Y-%m-%d') + datetime.timedelta(
-                    days=-7)).strftime('%Y-%m-%d')
-                while (datetime.datetime(int(date_to[:4]), int(date_to[5:7]), int(date_to[8:])) - datetime.datetime(
-                        int(date_from[:4]), int(date_from[5:7]), int(date_from[8:]))).days < diff_time:
-                    date_from = (datetime.datetime.strptime(date_from, '%Y-%m-%d') + datetime.timedelta(
-                        days=-7)).strftime('%Y-%m-%d')
-                eles = []
-                date_from = date_from + ' 00:00:00'
-                date_to = date_to + ' 00:00:00'
-                record = {}
-                while date_from <= date_to:
-                    ele = 0
-                    date_from = date_from.replace(' ', 'T')
-                    url1 = self.url + '?zone_code=' + location + '&date_to=' + date_from
-                    r = requests.get(url1, headers=self.headers)
-                    r = r.json()['_embedded']
-                    a = []
-                    for i in r:
-                        if i['recordDatetime'] == date_from + '+08:00':
-                            a.append(i['meterCode'])
-                            if i['meterCode'] in record.keys() and i['readings']['kwh'] != 0:
-                                ele += i['readings']['kwh']
-                                record[i['meterCode']] = i['readings']['kwh']
-                            elif i['meterCode'] in record.keys() and record[i['meterCode']] != 0 and i['readings'][
-                                'kwh'] == 0:
-                                ele += record[i['meterCode']]
-
-                            elif i['meterCode'] not in record.keys() and i['readings']['kwh'] != 0:
-                                record[i['meterCode']] = i['readings']['kwh']
-                                ele += record[i['meterCode']]
-                                eles = [j + i['readings']['kwh'] for j in eles]
-                    for i in record.keys():
-                        if i not in a:
-                            ele += record[i]
-                    if ele != 0:
-                        eles.append(round(ele, 2))
-                    date_from = date_from.replace('T', ' ')
-                    date_from = (datetime.datetime.strptime(date_from, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(
-                        days=1)).strftime('%Y-%m-%d %H:%M:%S')
-                y = []
-                for i in range(len(eles) - 1):
-                    y.append(round(eles[i + 1] - eles[i], 2))
-                x = np.array(range(len(y))) + 1
-                x = x.reshape(-1, 1)
-                y = np.array(y)
-                y = y.reshape(-1, 1)
-                quadratic_featurizer = PolynomialFeatures(degree=2)
-                x = quadratic_featurizer.fit_transform(x)
-                model = LinearRegression()
-                model.fit(x, y)
-
-                x1 = len(eles) + (
-                            datetime.datetime(int(date1[:4]), int(date1[5:7]), int(date1[8:])) - datetime.datetime(
-                        int(date_from[:4]), int(date_from[5:7]), int(date_from[8:10]))).days
-                x2 = len(eles) + (
-                            datetime.datetime(int(date2[:4]), int(date2[5:7]), int(date2[8:])) - datetime.datetime(
-                        int(date_from[:4]), int(date_from[5:7]), int(date_from[8:10]))).days
-                x_pred = np.array(range(x1, x2 + 1)).reshape(-1, 1)
-                x_pred = quadratic_featurizer.transform(x_pred)
-                predictions = model.predict(x_pred)
-                print(predictions)
-                count = 0
-                print(date1, date2)
-                text = location + '在' + str(int(date1[5:7])) + '月' + str(int(date1[8:])) + '日至' + str(
-                    int(date2[5:7])) + '月' + str(int(date2[8:])) + '日的用电预测如下：\n'
-                while date1 <= date_to:
-                    text += str(int(date1[5:7])) + '月' + str(int(date1[8:])) + '日：' + str(
-                        round(predictions[count], 2)) + 'kwh\n'
-                    count += 1
-                    date1 = (dat etime.datetime.strptime(date1, '%Y-%m-%d') + datetime.timedelta(
-                        days=1)).strftime('%Y-%m-%d')
-                return text
-        except (KeyError,ValueError):
-            return '抱歉呀，UMor暂时无法做出这个预测噢~'
-
+            return str({'text':ans, 'type': 'text'})
 
 def TL(text):
     api = 'http://www.tuling123.com/openapi/api'
@@ -666,5 +316,5 @@ def TL(text):
 
 
 if __name__ == '__main__':
-    print(Dis_Ans('E12在11月30日下午5点的用电预测'))
+    print(Dis_Ans('我想知道明晚8点E11的用电量'))
 
